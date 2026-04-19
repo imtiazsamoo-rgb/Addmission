@@ -140,7 +140,7 @@
             <div class="field"><label for="studentName">Student Name</label><input id="studentName" name="studentName" required /></div>
             <div class="field"><label for="surnameCast">Surname/Cast</label><input id="surnameCast" name="surnameCast" required /></div>
             <div class="field"><label for="gender">Gender</label><select id="gender" name="gender" required><option value="">Select Gender</option><option>Male</option><option>Female</option></select></div>
-            <div class="field"><label for="dob">Date of Birth</label><input id="dob" name="dob" type="date" required /></div>
+            <div class="field"><label for="dob">Date of Birth</label><input id="dob" name="dob" type="text" placeholder="dd/mm/yyyy" maxlength="10" required /><div class="note">Enter date as dd/mm/yyyy</div></div>
             <div class="field"><label for="birthPlace">Birth Place</label><input id="birthPlace" name="birthPlace" required /></div>
             <div class="field"><label for="religion">Religion</label><input id="religion" name="religion" required /></div>
           </div>
@@ -151,7 +151,7 @@
             <div class="section-title">Admission Information</div>
             <div class="field"><label for="admitClass">Admit in Class</label><select id="admitClass" name="admitClass" required><option value="">Select Class</option><option>Kachi</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option></select></div>
             <div class="field"><label for="currentClass">Current Class</label><select id="currentClass" name="currentClass" required><option value="">Select Class</option><option>Kachi</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option><option>VII</option><option>VIII</option></select></div>
-            <div class="field"><label for="dateOfAdmission">Date of Admission</label><input id="dateOfAdmission" name="dateOfAdmission" type="date" required /></div>
+            <div class="field"><label for="dateOfAdmission">Date of Admission</label><input id="dateOfAdmission" name="dateOfAdmission" type="text" placeholder="dd/mm/yyyy" maxlength="10" required /><div class="note">Enter date as dd/mm/yyyy</div></div>
             <div class="field"><label for="shift">Shift</label><select id="shift" name="shift" required><option value="">Select Shift</option><option>Morning</option><option>Afternoon</option><option>Evening</option></select></div>
             <div class="field"><label for="bFormNo">B Form No</label><input id="bFormNo" name="bFormNo" inputmode="numeric" maxlength="13" required /><div class="note">13 digits required</div></div>
           </div>
@@ -223,7 +223,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <script>
-    const APPS_SCRIPT_WEB_APP_URL ='https://script.google.com/macros/s/AKfycbxr0WDNCT_rED7GENZ7FTUGLow8RRikbTFvjB-c1Ea8B8oYWVCiGetfB28ulZ2nJ11-qA/exec';
+    const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzkja68kzTrywDKPXwlIXpLnlTqI9fGO9IaEtMqpTzfhEBwYypO-6CUArDJ7GACUE-QFg/exec';
 
     const form = document.getElementById('admissionForm');
     const globalSchoolCode = document.getElementById('globalSchoolCode');
@@ -256,6 +256,48 @@
     let currentStep = 1;
 
     function digitsOnly(value) { return (value || '').toString().replace(/\D/g, ''); }
+    function formatDateInput(value) {
+      const digits = (value || '').replace(/\D/g, '').slice(0, 8);
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 4) return digits.slice(0, 2) + '/' + digits.slice(2);
+      return digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+    }
+
+    function isValidDdMmYyyy(value) {
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return false;
+      const [dd, mm, yyyy] = value.split('/').map(Number);
+      const d = new Date(yyyy, mm - 1, dd);
+      return d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd;
+    }
+
+    function ddmmyyyyToSheetFormat(value) {
+      if (!isValidDdMmYyyy(value)) return '';
+      const [dd, mm, yyyy] = value.split('/');
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      return `${dd}-${months[Number(mm) - 1]}-${yyyy}`;
+    }
+
+    function sheetFormatToDdMmYyyy(value) {
+      if (!value) return '';
+      const str = String(value).trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+      if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(str)) {
+        const [dd, mon, yyyy] = str.split('-');
+        const monthMap = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        return `${dd}/${monthMap[mon] || '01'}/${yyyy}`;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        const [yyyy, mm, dd] = str.split('-');
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      const d = new Date(str);
+      if (isNaN(d)) return str;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
 
     function isFieldValidForSequence(el) {
       if (!el) return false;
@@ -328,7 +370,7 @@
         const el = document.getElementById(id);
         if (!el) return;
 
-        const eventName = (el.tagName === 'SELECT' || el.type === 'date') ? 'change' : 'input';
+        const eventName = (el.tagName === 'SELECT') ? 'change' : 'input';
 
         el.addEventListener(eventName, () => {
           if (['grNo', 'bFormNo', 'fatherCnic', 'motherCnic', 'parentsCnic', 'parentContact'].includes(id)) {
@@ -339,6 +381,14 @@
         });
       });
     }
+
+    ['dob', 'dateOfAdmission'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => {
+        el.value = formatDateInput(el.value);
+      });
+    });
 
     ['searchGrNo', 'grNo', 'bFormNo', 'fatherCnic', 'motherCnic', 'parentsCnic', 'parentContact'].forEach((id) => {
       const el = document.getElementById(id);
@@ -435,6 +485,11 @@
           continue;
         }
 
+        if (id === 'dob' || id === 'dateOfAdmission') {
+          if (!isValidDdMmYyyy(value)) { setInlineError(el, 'Enter date in dd/mm/yyyy format.'); el.focus(); showStatus('Please complete all required fields correctly.', 'error'); return false; }
+          continue;
+        }
+
         if (!value) { setInlineError(el, 'This field is required.'); el.focus(); showStatus('Please complete all required fields.', 'error'); return false; }
       }
 
@@ -499,14 +554,14 @@
       document.getElementById('motherName').value = record.motherName || '';
       document.getElementById('motherCnic').value = record.motherCnic || '';
       document.getElementById('gender').value = record.gender || '';
-      document.getElementById('dob').value = record.dob || '';
+      document.getElementById('dob').value = sheetFormatToDdMmYyyy(record.dob || '');
       document.getElementById('admitClass').value = record.admitClass || '';
       document.getElementById('parentsCnic').value = record.parentsCnic || '';
       document.getElementById('currentClass').value = record.currentClass || '';
       document.getElementById('religion').value = record.religion || '';
       document.getElementById('birthPlace').value = record.birthPlace || '';
       document.getElementById('parentContact').value = record.parentContact || '';
-      document.getElementById('dateOfAdmission').value = record.dateOfAdmission || '';
+      document.getElementById('dateOfAdmission').value = sheetFormatToDdMmYyyy(record.dateOfAdmission || '');
       document.getElementById('shift').value = record.shift || '';
       document.getElementById('originalSchoolCode').value = record.schoolCode || '';
       document.getElementById('originalGrNo').value = record.grNo || '';
@@ -555,35 +610,110 @@
 
     async function downloadSchoolPdf() {
       const schoolCode = (globalSchoolCode.value || '').trim();
+
       if (!schoolCode) {
         showStatus('Please select School Code first.', 'error');
         return;
       }
 
+      
+
+      if (!pdfTab) {
+        showStatus('Popup blocked. Please allow popups for this site and try again.', 'error');
+        return;
+      }
+
+      pdfTab.document.open();
+      // removed popup write(`
+        <html>
+          <head>
+            <title>Preparing PDF...</title>
+          </head>
+          <body style="font-family: Arial, sans-serif; padding: 24px;">
+            <h2>Preparing PDF...</h2>
+            <p>Please wait while your PDF is being generated.</p>
+          </body>
+        </html>
+      `);
+      
+
       try {
         showStatus('Preparing PDF...', 'info');
+
         const result = await postToScript({ action: 'downloadPdf', schoolCode });
-        if (!result.success) throw new Error(result.message || 'PDF download failed.');
-        if (!result.downloadUrl || !result.fileId) throw new Error('PDF link was not generated properly.');
 
-        const a = document.createElement('a');
-        a.href = result.downloadUrl;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        if (!result.success) {
+          throw new Error(result.message || 'PDF generation failed.');
+        }
 
-        showStatus('PDF download started successfully.', 'success');
+        if (!result.viewUrl && !result.downloadUrl) {
+          throw new Error('PDF links were not generated.');
+        }
 
-        setTimeout(async () => {
-          try {
-            await postToScript({ action: 'cleanupPdf', fileId: result.fileId });
-          } catch (cleanupError) {
-            console.error('Cleanup failed:', cleanupError);
-          }
-        }, 120000);
+        const openUrl = result.viewUrl || result.downloadUrl;
+        const directUrl = result.downloadUrl || result.viewUrl;
+
+        pdfTab.document.open();
+        // removed popup write(`
+          <html>
+            <head>
+              <title>PDF Ready</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; padding: 24px;">
+              <h2>PDF is ready</h2>
+              <p>Your PDF has been generated successfully.</p>
+
+              <div style="margin-top:20px;">
+                <a href="${openUrl}" target="_self"
+                   style="display:inline-block;padding:12px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;margin-right:10px;">
+                  Open PDF
+                </a>
+
+                <a href="${directUrl}" target="_self"
+                   style="display:inline-block;padding:12px 18px;background:#16a34a;color:#fff;text-decoration:none;border-radius:8px;">
+                  Download PDF
+                </a>
+              </div>
+
+              <p style="margin-top:20px;color:#555;">
+                If the PDF does not open automatically, click one of the buttons above.
+              </p>
+
+              <script>
+                setTimeout(function () {
+                  window.location.href = ${JSON.stringify(openUrl)};
+                }, 800);
+              <\/script>
+            </body>
+          </html>
+        `);
+        
+
+        showStatus('PDF is ready. The new tab now has Open and Download options.', 'success');
+
+        if (result.fileId) {
+          setTimeout(async () => {
+            try {
+              await postToScript({ action: 'cleanuppdf', fileId: result.fileId });
+            } catch (cleanupError) {
+              console.error('Cleanup failed:', cleanupError);
+            }
+          }, 120000);
+        }
+
       } catch (error) {
+        pdfTab.document.open();
+        // removed popup write(`
+          <html>
+            <head><title>PDF Error</title></head>
+            <body style="font-family: Arial, sans-serif; padding: 24px;">
+              <h2>PDF Error</h2>
+              <p>${String(error.message || 'PDF generation failed.')}</p>
+            </body>
+          </html>
+        `);
+        
+
         showStatus(error.message || 'PDF download failed.', 'error');
       }
     }
@@ -618,14 +748,14 @@
         motherName: (document.getElementById('motherName').value || '').trim(),
         motherCnic: digitsOnly(document.getElementById('motherCnic').value || ''),
         gender: document.getElementById('gender').value || '',
-        dob: document.getElementById('dob').value || '',
+        dob: ddmmyyyyToSheetFormat(document.getElementById('dob').value || ''),
         admitClass: document.getElementById('admitClass').value || '',
         parentsCnic: digitsOnly(document.getElementById('parentsCnic').value || ''),
         currentClass: document.getElementById('currentClass').value || '',
         religion: (document.getElementById('religion').value || '').trim(),
         birthPlace: (document.getElementById('birthPlace').value || '').trim(),
         parentContact: digitsOnly(document.getElementById('parentContact').value || ''),
-        dateOfAdmission: document.getElementById('dateOfAdmission').value || '',
+        dateOfAdmission: ddmmyyyyToSheetFormat(document.getElementById('dateOfAdmission').value || ''),
         shift: document.getElementById('shift').value || '',
         studentPhotoBase64: croppedImageBase64,
         studentPhotoMimeType: croppedMimeType,
